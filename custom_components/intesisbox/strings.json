@@ -123,12 +123,14 @@
         "data": {
           "enable_ping": "Enable WMP Ping Keepalive",
           "sync_time": "Sync Time on Startup",
-          "use_local_time": "    Use Local Time"
+          "use_local_time": "    Use Local Time",
+          "display_fahrenheit": "Display Temperature in Fahrenheit (2°F steps)"
         },
         "data_description": {
           "enable_ping": "When enabled, sends PING commands",
           "sync_time": "Set device time when integration loads",
-          "use_local_time": "Checked = local time, unchecked = UTC time (only applies if Sync Time enabled)"
+          "use_local_time": "Checked = local time, unchecked = UTC time (only applies if Sync Time enabled)",
+          "display_fahrenheit": "Show the climate entity in Fahrenheit with 2°F steps that match the Fujitsu UTY-RNNUM wall remote (60-88°F ↔ 16-30°C). Reload the integration after changing."
         }
       }
     }

@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant, callback  # type: ignore
 from homeassistant.data_entry_flow import AbortFlow, FlowResult  # type: ignore
 
 from .const import (
+    CONF_DISPLAY_FAHRENHEIT,
     CONF_ENABLE_PING,
     CONF_FAN_MODE_1,
     CONF_FAN_MODE_2,
@@ -49,6 +50,7 @@ from .const import (
     CONF_VANE_VERTICAL_9,
     CONF_VANE_VERTICAL_AUTO,
     CONF_VANE_VERTICAL_SWING,
+    DEFAULT_DISPLAY_FAHRENHEIT,
     DEFAULT_ENABLE_PING,
     DEFAULT_FAN_MODES,
     DEFAULT_NAME,
@@ -164,6 +166,7 @@ class IntesisBoxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: i
                         "vane_horizontal_modes": DEFAULT_VANE_HORIZONTAL_MODES,
                         CONF_SYNC_TIME: DEFAULT_SYNC_TIME,
                         CONF_USE_LOCAL_TIME: DEFAULT_USE_LOCAL_TIME,
+                        CONF_DISPLAY_FAHRENHEIT: DEFAULT_DISPLAY_FAHRENHEIT,
                     },
                 )
 
@@ -230,6 +233,9 @@ class IntesisBoxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: i
                     ),
                     CONF_USE_LOCAL_TIME: import_config.get(
                         CONF_USE_LOCAL_TIME, DEFAULT_USE_LOCAL_TIME
+                    ),
+                    CONF_DISPLAY_FAHRENHEIT: import_config.get(
+                        CONF_DISPLAY_FAHRENHEIT, DEFAULT_DISPLAY_FAHRENHEIT
                     ),
                 },
             )
@@ -524,6 +530,9 @@ class IntesisBoxOptionsFlow(config_entries.OptionsFlow):
                     CONF_USE_LOCAL_TIME: user_input.get(
                         CONF_USE_LOCAL_TIME, DEFAULT_USE_LOCAL_TIME
                     ),
+                    CONF_DISPLAY_FAHRENHEIT: user_input.get(
+                        CONF_DISPLAY_FAHRENHEIT, DEFAULT_DISPLAY_FAHRENHEIT
+                    ),
                 },
             )
 
@@ -539,6 +548,9 @@ class IntesisBoxOptionsFlow(config_entries.OptionsFlow):
         )
         current_use_local_time = self._config_entry.data.get(
             CONF_USE_LOCAL_TIME, DEFAULT_USE_LOCAL_TIME
+        )
+        current_display_fahrenheit = self._config_entry.data.get(
+            CONF_DISPLAY_FAHRENHEIT, DEFAULT_DISPLAY_FAHRENHEIT
         )
 
         return self.async_show_form(
@@ -556,6 +568,10 @@ class IntesisBoxOptionsFlow(config_entries.OptionsFlow):
                     vol.Optional(
                         CONF_USE_LOCAL_TIME,
                         default=current_use_local_time,
+                    ): bool,
+                    vol.Optional(
+                        CONF_DISPLAY_FAHRENHEIT,
+                        default=current_display_fahrenheit,
                     ): bool,
                 }
             ),

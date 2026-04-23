@@ -32,11 +32,15 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback  # type: i
 from homeassistant.helpers.event import async_call_later  # type: ignore
 
 from .const import (
+    CELSIUS_TO_FAHRENHEIT,
+    CONF_DISPLAY_FAHRENHEIT,
+    DEFAULT_DISPLAY_FAHRENHEIT,
     DEFAULT_FAN_MODES,
     DEFAULT_NAME,
     DEFAULT_VANE_HORIZONTAL_MODES,
     DEFAULT_VANE_VERTICAL_MODES,
     DOMAIN,
+    FAHRENHEIT_TO_CELSIUS,
 )
 from .intesisbox import IntesisBox
 
@@ -76,6 +80,27 @@ MAP_OPERATION_MODE_TO_HA = {
     "OFF": HVACMode.OFF,
 }
 MAP_OPERATION_MODE_TO_IB = {v: k for k, v in MAP_OPERATION_MODE_TO_HA.items()}
+
+def _celsius_setpoint_to_fahrenheit(celsius: float) -> int:
+  """Map a °C setpoint echoed by the gateway to its RNNUM °F label."""
+  rounded_c = round(celsius)
+  if rounded_c in CELSIUS_TO_FAHRENHEIT:
+    return CELSIUS_TO_FAHRENHEIT[rounded_c]
+  return round((celsius * 1.8 + 32) / 2) * 2
+
+
+def _fahrenheit_setpoint_to_celsius(fahrenheit: float) -> float:
+  """Map a user-requested °F setpoint to the °C value the gateway expects."""
+  snapped_f = int((fahrenheit + 1) // 2 * 2)
+  if snapped_f in FAHRENHEIT_TO_CELSIUS:
+    return float(FAHRENHEIT_TO_CELSIUS[snapped_f])
+  return round((fahrenheit - 32) / 1.8)
+
+
+def _celsius_ambient_to_fahrenheit(celsius: float) -> float:
+  """Convert measured ambient °C to °F, preserving 0.1° resolution."""
+  return round(celsius * 1.8 + 32, 1)
+
 
 MAP_STATE_ICONS = {
     HVACMode.HEAT: "mdi:white-balance-sunny",
@@ -125,13 +150,21 @@ async def async_setup_entry(
     vane_horizontal_modes = entry.data.get(
         "vane_horizontal_modes", DEFAULT_VANE_HORIZONTAL_MODES
     )
+    display_fahrenheit = entry.data.get(
+        CONF_DISPLAY_FAHRENHEIT, DEFAULT_DISPLAY_FAHRENHEIT
+    )
     # Use entry title (device name) for the entity's friendly name
     name = entry.title
 
     async_add_entities(
         [
             IntesisBoxAC(
-                controller, name, fan_modes, vane_vertical_modes, vane_horizontal_modes
+                controller,
+                name,
+                fan_modes,
+                vane_vertical_modes,
+                vane_horizontal_modes,
+                display_fahrenheit,
             )
         ],
         True,
@@ -141,7 +174,6 @@ async def async_setup_entry(
 class IntesisBoxAC(ClimateEntity):
     """Represents an Intesisbox air conditioning device."""
 
-    _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_should_poll = True
 
     def __init__(
@@ -151,9 +183,17 @@ class IntesisBoxAC(ClimateEntity):
         fan_modes: dict[str, str] | None = None,
         vane_vertical_modes: dict[str, str] | None = None,
         vane_horizontal_modes: dict[str, str] | None = None,
+        display_fahrenheit: bool = DEFAULT_DISPLAY_FAHRENHEIT,
     ) -> None:
         """Initialize the thermostat."""
         self._controller = controller
+        self._display_fahrenheit = display_fahrenheit
+
+        if display_fahrenheit:
+            self._attr_temperature_unit = UnitOfTemperature.FAHRENHEIT
+            self._attr_target_temperature_step = 2.0
+        else:
+            self._attr_temperature_unit = UnitOfTemperature.CELSIUS
 
         self._deviceid = controller.device_mac_address
         self._attr_name = name or controller.device_mac_address
@@ -381,9 +421,19 @@ class IntesisBoxAC(ClimateEntity):
             await self.async_set_hvac_mode(operation_mode)
 
         if temperature:
+            if self._display_fahrenheit:
+                celsius = _fahrenheit_setpoint_to_celsius(temperature)
+                _LOGGER.debug(
+                    "%s Fahrenheit setpoint %s mapped to %s°C",
+                    self._log_prefix,
+                    temperature,
+                    celsius,
+                )
+            else:
+                celsius = temperature
             try:
                 await self.hass.async_add_executor_job(
-                    self._controller.set_temperature, temperature
+                    self._controller.set_temperature, celsius
                 )
             except Exception as err:
                 _LOGGER.error(
@@ -685,12 +735,18 @@ class IntesisBoxAC(ClimateEntity):
     @property
     def min_temp(self) -> float:
         """Return the minimum temperature for the current mode of operation."""
-        return self._attr_min_temp if self._attr_min_temp is not None else 16.0
+        celsius = self._attr_min_temp if self._attr_min_temp is not None else 16.0
+        if self._display_fahrenheit:
+            return float(_celsius_setpoint_to_fahrenheit(celsius))
+        return celsius
 
     @property
     def max_temp(self) -> float:
         """Return the maximum temperature for the current mode of operation."""
-        return self._attr_max_temp if self._attr_max_temp is not None else 30.0
+        celsius = self._attr_max_temp if self._attr_max_temp is not None else 30.0
+        if self._display_fahrenheit:
+            return float(_celsius_setpoint_to_fahrenheit(celsius))
+        return celsius
 
     @property
     def hvac_modes(self) -> list[HVACMode]:
@@ -737,6 +793,10 @@ class IntesisBoxAC(ClimateEntity):
     @property
     def current_temperature(self) -> float | None:
         """Return the current temperature."""
+        if self._current_temp is None:
+            return None
+        if self._display_fahrenheit:
+            return _celsius_ambient_to_fahrenheit(self._current_temp)
         return self._current_temp
 
     @property
@@ -749,6 +809,10 @@ class IntesisBoxAC(ClimateEntity):
     @property
     def target_temperature(self) -> float | None:
         """Return the current setpoint temperature if unit is on."""
-        if self._power and self.hvac_mode not in [HVACMode.FAN_ONLY, HVACMode.OFF]:
-            return self._target_temperature
-        return None
+        if not self._power or self.hvac_mode in [HVACMode.FAN_ONLY, HVACMode.OFF]:
+            return None
+        if self._target_temperature is None:
+            return None
+        if self._display_fahrenheit:
+            return float(_celsius_setpoint_to_fahrenheit(self._target_temperature))
+        return self._target_temperature
