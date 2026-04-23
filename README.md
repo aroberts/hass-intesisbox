@@ -10,7 +10,7 @@ Control Intesis Air Conditioning Gateways locally via the WMP Protocol.
 2. Click on "Integrations"
 3. Click the three dots in the top right corner
 4. Select "Custom repositories"
-5. Add the repository URL: `https://github.com/jnimmo/hass-intesisbox`
+5. Add the repository URL: `https://github.com/aroberts/hass-intesisbox`
 6. Select "Integration" as the category
 7. Click "Add"
 8. Click "Install" on the IntesisBox card that appears

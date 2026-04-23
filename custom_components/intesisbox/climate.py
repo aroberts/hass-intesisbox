@@ -1,7 +1,7 @@
 """Support for Intesis Air Conditioning Gateways using the WMP Protocol.
 
 For more details about this platform, please refer to the documentation at
-https://github.com/jnimmo/hass-intesisbox
+https://github.com/aroberts/hass-intesisbox
 """
 
 from datetime import timedelta
